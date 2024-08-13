@@ -1,59 +1,82 @@
 import "./style.css";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
+// Create scene
 const scene = new THREE.Scene();
-
-const geometry = new THREE.IcosahedronGeometry(1.0, 2);
-const material = new THREE.MeshStandardMaterial({
-  color: "9D9D9D",
-  flatShading: true,
-});
-
-const cube = new THREE.Mesh(geometry, material);
-scene.add(cube);
 
 const temp = {
   width: window.innerWidth,
   height: window.innerHeight,
 };
 
-const fov = 75;
+// Set up camera
+const fov = 45;
 const aspect = temp.width / temp.height;
-const near = 0.1;
-const far = 1000;
-
+const near = 1;
+const far = 10000;
 const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+camera.position.set(0, 2, 10);
 
-const hemiLight = new THREE.HemisphereLight(0x0099ff, 0x080820, 1);
-scene.add(hemiLight);
-
+// Set up renderer
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(temp.width, temp.height);
+document.body.appendChild(renderer.domElement);
 
+// Add lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Soft white light
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Strong directional light
+directionalLight.position.set(1, 1, 1).normalize();
+scene.add(directionalLight);
+
+// Set up OrbitControls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.25;
+controls.target.set(0, 0, 0); // Focus on the origin (or adjust as needed)
+controls.update();
 
-const loader = new GLTFLoader();
+let mixer = null;
 
-document.body.appendChild(renderer.domElement);
+// Load FBX model
+const loader = new FBXLoader();
+loader.load(
+  "/animated_human.fbx",
+  function (object) {
+    object.scale.set(0.01, 0.01, 0.01);
 
-const wireMesh = new THREE.MeshBasicMaterial({
-  color: "white",
-  wireframe: true,
-});
-const wireframe = new THREE.Mesh(geometry, wireMesh);
-cube.add(wireframe);
+    // Set up the animation mixer
+    mixer = new THREE.AnimationMixer(object);
 
-camera.position.z = 2;
-renderer.render(scene, camera);
+    console.log("Object animations: ", object.animations[6]);
 
-function animate(t = 0) {
+    // Assuming the first animation in the model
+    const action = mixer.clipAction(object.animations[6]);
+    action.play();
+    scene.add(object);
+  },
+  (xhr) => {
+    console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+  },
+  function (error) {
+    console.error(error);
+  }
+);
+
+// Animation loop
+function animate() {
   requestAnimationFrame(animate);
-  cube.rotation.y = t * 0.0001;
+
+  if (mixer) mixer.update(0.01); // Adjust the time delta as necessary
+  // Update controls
+  controls.update();
+
+  // Render the scene
   renderer.render(scene, camera);
 }
 
+// Start animation loop
 animate();
